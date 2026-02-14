@@ -1,8 +1,8 @@
 from fastapi import FastAPI 
 from data import *
-from github import get_devs_contributions
+from github import get_devs_contribs
 
-IS_PROD_ENV = False # Note: change to True before deploy
+IS_PROD_ENV = True # Note: change to True before deploy
 DEV_LIMIT = 9
 
 if not IS_PROD_ENV:
@@ -25,7 +25,10 @@ async def get_month_data(date_string: str = 'today', devs: str = ''):
     elif num_devs > DEV_LIMIT:
         return DataResult(data=None, message=f'Devs list exceeds limit: {DEV_LIMIT}')
     
-    dev_contribs = await get_devs_contributions(devs_list, input_date)
+    dev_contribs, err = await get_devs_contribs(devs_list, input_date)
+    if err.has:
+        return DataResult(data=None, message=err.message)
+    
     return DataResult(data = {
         'date' : input_date,
         'contribs': dev_contribs,
@@ -33,7 +36,6 @@ async def get_month_data(date_string: str = 'today', devs: str = ''):
 
 '''
 TODO:
-- Fetch GitHub contributions
 - Hash the devs list and cache results for 1 hr 
 - Add force flag to force re-fetching of GitHub contribs
 '''
