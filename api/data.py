@@ -4,6 +4,18 @@ from typing import Optional
 
 okMessage = 'OK'
 std_date_format = '%Y-%m-%d'
+
+goodapps_devs = [
+    'roidaradal',
+    'dayananronel',
+    'emmantero',
+    'denzeysenpai',
+    'JaedQ',
+    'johndaves6240',
+    'Stambordu',
+    'markDoesany',
+    'charleszardd',
+]
     
 class ActionResult(BaseModel):
     success: bool = True 
@@ -14,6 +26,7 @@ class DataResult[T](BaseModel):
     message: str = okMessage
 
 def new_date(date_string: str) -> date:
+    '''Parse date_string as date, defaults to date today if invalid date'''
     today = date.today()
     if date_string.lower() == 'today':
         return today 
@@ -23,4 +36,16 @@ def new_date(date_string: str) -> date:
         return today
 
 def date_format(d: date) -> str:
+    '''String representation of date object in standard format'''
     return d.strftime(std_date_format)
+
+def get_devs(devs: str) -> list[str]:
+    '''Get list of devs from the input string'''
+    devs = devs.strip()
+    match devs:
+        case '':
+            return []
+        case '@goodapps':
+            return goodapps_devs
+        case _:
+            return [x.strip() for x in devs.split(',')]
