@@ -7,3 +7,4 @@ v0.1.0 - Contribs API
     x Fetch devs Github pages asynchronously
     x Convert to single-file for Vercel deployment
     x Split back into multiple files for organization
+    x Load dev limit from env

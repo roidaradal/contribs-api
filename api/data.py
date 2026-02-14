@@ -36,3 +36,10 @@ def get_devs(devs: str) -> list[str]:
     if devs == '':
         return []
     return [x.strip() for x in devs.split(',')]
+
+def get_dev_limit() -> int:
+    try:
+        limit = int(os.getenv('DEV_LIMIT') or '9')
+        return max(1, limit) # floor dev limit = 1
+    except:
+        return 9 # default limit
