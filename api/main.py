@@ -1,7 +1,8 @@
-import data, github
-from fastapi import FastAPI 
+from fastapi import FastAPI
+from .data import ActionResult, DataResult, new_date, get_devs, get_dev_limit
+from .github import get_devs_contribs
 
-IS_PROD_ENV = False # Note: change to True before deploy
+IS_PROD_ENV = True # Note: change to True before deploy
 
 if not IS_PROD_ENV:
     from dotenv import load_dotenv
@@ -10,25 +11,25 @@ if not IS_PROD_ENV:
 app = FastAPI()
 
 @app.get('/')
-async def health_check() -> data.ActionResult:
-    return data.ActionResult(success=True, message='OK')
+async def health_check() -> ActionResult:
+    return ActionResult(success=True, message='OK')
 
 @app.get('/{date_string}')
 async def get_month_data(date_string: str = 'today', devs: str = '', force: bool = False):
-    input_date = data.new_date(date_string)
-    devs_list = data.get_devs(devs)
+    input_date = new_date(date_string)
+    devs_list = get_devs(devs)
     num_devs = len(devs_list)
-    dev_limit = data.get_dev_limit()
+    dev_limit = get_dev_limit()
     if num_devs == 0:
-        return data.DataResult(data=None, message='Empty devs list')
+        return DataResult(data=None, message='Empty devs list')
     elif num_devs > dev_limit:
-        return data.DataResult(data=None, message=f'Devs list exceeds limit: {dev_limit}')
+        return DataResult(data=None, message=f'Devs list exceeds limit: {dev_limit}')
     
-    dev_contribs, err = await github.get_devs_contribs(devs_list, input_date, force)
+    dev_contribs, err = await get_devs_contribs(devs_list, input_date, force)
     if err.has:
-        return data.DataResult(data=None, message=err.message)
+        return DataResult(data=None, message=err.message)
     
-    return data.DataResult(data = {
+    return DataResult(data = {
         'date' : input_date,
         'contribs': dev_contribs,
     })
