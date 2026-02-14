@@ -15,6 +15,10 @@ app = FastAPI()
 async def health_check() -> ActionResult:
     return ActionResult(success=True, message='OK')
 
+@app.get('/version')
+async def get_version() -> DataResult:
+    return DataResult(data = {'version': CURRENT_VERSION})
+
 @app.get('/{date_string}')
 async def get_month_data(date_string: str = 'today', devs: str = '', force: bool = False) -> DataResult:
     input_date = new_date(date_string)
@@ -34,7 +38,3 @@ async def get_month_data(date_string: str = 'today', devs: str = '', force: bool
         'date' : input_date,
         'contribs': dev_contribs,
     })
-
-@app.get('/version')
-async def get_version() -> DataResult:
-    return DataResult(data = {'version': CURRENT_VERSION})
