@@ -11,7 +11,7 @@ uvicorn main:app --reload
 ## Rebasing dev to main 
 ```bash
 git switch dev 
-git fetch origin # may be omitted if after PR merge, if dev is up-to-date
+git fetch origin 
 git rebase origin/main 
 git push origin dev --force
 ```
@@ -19,7 +19,7 @@ git push origin dev --force
 ## Merging main to dev 
 ```bash
 git switch dev
-git fetch origin # may be omitted if after PR merge, if dev is up-to-date
+git fetch origin
 git merge origin/main 
 git push origin dev
 ```
