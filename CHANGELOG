@@ -1,5 +1,5 @@
 v0.1.0 - Contribs API 
-    - Commit: 
+    x Commit: 2026-02-14 23:57
     x Initialize FastAPI
     x Validate and parse date input 
     x Get devs list from query params
@@ -11,4 +11,4 @@ v0.1.0 - Contribs API
     x Load cache TTL minutes from env 
     x Cache dev contribs results
     x Used cache result if still fresh and force=False
-    - Version endpoint
+    x Version endpoint
