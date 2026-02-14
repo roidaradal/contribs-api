@@ -1,8 +1,12 @@
 from fastapi import FastAPI 
-from dotenv import load_dotenv
 from data import *
 
-load_dotenv()
+is_prod_env = True 
+
+if not is_prod_env:
+    from dotenv import load_dotenv
+    load_dotenv()
+
 app = FastAPI()
 
 @app.get('/')
