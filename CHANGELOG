@@ -2,4 +2,5 @@ v0.1.0 - Contribs API
     - Commit: 
     x Initialize FastAPI
     x Validate and parse date input 
-    - Get devs list from query params
+    x Get devs list from query params
+    x Load tagged devs from env

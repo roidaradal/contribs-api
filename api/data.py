@@ -1,21 +1,10 @@
+import os
 from datetime import date
 from pydantic import BaseModel 
 from typing import Optional
 
 okMessage = 'OK'
 std_date_format = '%Y-%m-%d'
-
-goodapps_devs = [
-    'roidaradal',
-    'dayananronel',
-    'emmantero',
-    'denzeysenpai',
-    'JaedQ',
-    'johndaves6240',
-    'Stambordu',
-    'markDoesany',
-    'charleszardd',
-]
     
 class ActionResult(BaseModel):
     success: bool = True 
@@ -42,10 +31,8 @@ def date_format(d: date) -> str:
 def get_devs(devs: str) -> list[str]:
     '''Get list of devs from the input string'''
     devs = devs.strip()
-    match devs:
-        case '':
-            return []
-        case '@goodapps':
-            return goodapps_devs
-        case _:
-            return [x.strip() for x in devs.split(',')]
+    if devs == '@goodapps':
+        devs = os.getenv('GOODAPPS_DEVS') or ''
+    if devs == '':
+        return []
+    return [x.strip() for x in devs.split(',')]

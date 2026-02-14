@@ -1,6 +1,8 @@
 from fastapi import FastAPI 
+from dotenv import load_dotenv
 from data import *
 
+load_dotenv()
 app = FastAPI()
 
 @app.get('/')
@@ -18,7 +20,5 @@ async def get_month_data(date_string: str = 'today', devs: str = ''):
 
 '''
 TODO:
-- If date is 'today', use today's date 
-- Otherwise, check if valid date parameter 
-- 
+- Fetch GitHub contributions
 '''
