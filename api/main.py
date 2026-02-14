@@ -14,7 +14,7 @@ async def health_check() -> data.ActionResult:
     return data.ActionResult(success=True, message='OK')
 
 @app.get('/{date_string}')
-async def get_month_data(date_string: str = 'today', devs: str = ''):
+async def get_month_data(date_string: str = 'today', devs: str = '', force: bool = False):
     input_date = data.new_date(date_string)
     devs_list = data.get_devs(devs)
     num_devs = len(devs_list)
@@ -24,7 +24,7 @@ async def get_month_data(date_string: str = 'today', devs: str = ''):
     elif num_devs > dev_limit:
         return data.DataResult(data=None, message=f'Devs list exceeds limit: {dev_limit}')
     
-    dev_contribs, err = await github.get_devs_contribs(devs_list, input_date)
+    dev_contribs, err = await github.get_devs_contribs(devs_list, input_date, force)
     if err.has:
         return data.DataResult(data=None, message=err.message)
     
@@ -32,9 +32,3 @@ async def get_month_data(date_string: str = 'today', devs: str = ''):
         'date' : input_date,
         'contribs': dev_contribs,
     })
-
-'''
-TODO:
-- Hash the devs list and cache results for 1 hr 
-- Add force flag to force re-fetching of GitHub contribs
-'''
