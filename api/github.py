@@ -28,10 +28,9 @@ class Error(BaseModel):
         return self.message
 
 class Result:
-    def __init__(self, dev: str, contribs: MonthContribs, is_fresh: bool, error: Error):
+    def __init__(self, dev: str, contribs: MonthContribs, error: Error):
         self.dev = dev 
         self.contribs = contribs 
-        self.is_fresh = is_fresh 
         self.error = error
 
 CACHE: dict[str, tuple[datetime, MonthContribs]] = {}   # username.month.year => (time_saved, MonthContribs)
@@ -44,6 +43,10 @@ def get_cache_ttl_mins() -> int:
     except:
         return 60 # default cache TTL
 
+def display_dev_total(dev: str, contribs: MonthContribs, is_fresh: bool):
+    total = sum(x.count for x in contribs.values())
+    print(dev, total, 'fresh' if is_fresh else 'cache')
+
 async def get_devs_contribs(devs: list[str], input_date: date, force: bool) -> tuple[DevContribs, Error]:
     '''Fetch each dev's contributions for the month'''
     dev_contribs: DevContribs = {}
@@ -54,8 +57,6 @@ async def get_devs_contribs(devs: list[str], input_date: date, force: bool) -> t
         for r in results:
             if r.error.has: return {}, r.error
             dev_contribs[r.dev] = r.contribs
-            total = sum(x.count for x in r.contribs.values())
-            print(r.dev, total, 'fresh' if r.is_fresh else 'cache')
     return dev_contribs, Error()
 
 async def fetch_dev_contribs(dev: str, input_date: date, force: bool, client: httpx.AsyncClient) -> Result:
@@ -69,7 +70,8 @@ async def fetch_dev_contribs(dev: str, input_date: date, force: bool, client: ht
         cache_age_mins = (datetime.now() - time_saved).total_seconds() / 60
         if cache_age_mins < get_cache_ttl_mins():
             # Use cached value if still fresh
-            return Result(dev, contribs, False, Error())
+            display_dev_total(dev, contribs, False)
+            return Result(dev, contribs, Error())
 
     # Fetch HTML page and use BeautifulSoup 
     year_start = date(year, 1, 1) # January 1 of given year
@@ -79,10 +81,10 @@ async def fetch_dev_contribs(dev: str, input_date: date, force: bool, client: ht
         soup = BeautifulSoup(response.text, 'html.parser')
     except httpx.HTTPStatusError as e:
         error = Error(message = f'Status Error: {e.response.status_code}')
-        return Result(dev, {}, False, error)
+        return Result(dev, {}, error)
     except httpx.RequestError as e:
         error = Error(message = f'Request Error: {e.request.url}')
-        return Result(dev, {}, False, error)
+        return Result(dev, {}, error)
     
     # Setup month date range 
     last_month_day = calendar.monthrange(year, month)[1]
@@ -110,4 +112,5 @@ async def fetch_dev_contribs(dev: str, input_date: date, force: bool, client: ht
 
     # Add to cache 
     CACHE[cache_key] = (datetime.now(), contribs)
-    return Result(dev, contribs, True, Error())
+    display_dev_total(dev, contribs, True)
+    return Result(dev, contribs, Error())
