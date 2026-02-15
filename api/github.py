@@ -44,6 +44,7 @@ def get_cache_ttl_mins() -> int:
         return 60 # default cache TTL
 
 def display_dev_total(dev: str, contribs: MonthContribs, is_fresh: bool):
+    '''Print out the dev username, total contribs count, and fresh/cache'''
     total = sum(x.count for x in contribs.values())
     print(dev, total, 'fresh' if is_fresh else 'cache')
 
