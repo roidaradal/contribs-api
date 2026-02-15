@@ -44,3 +44,8 @@ def get_dev_limit() -> int:
         return max(1, limit) # floor dev limit = 1
     except:
         return 9 # default limit
+
+def get_cors_list() -> list[str]:
+    '''Get list of origins allowed for CORS policy'''
+    cors = os.getenv('CORS_LIST') or ''
+    return [x.strip() for x in cors.split(',')]

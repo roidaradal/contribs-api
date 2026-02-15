@@ -1,5 +1,6 @@
 from fastapi import FastAPI
-from .data import ActionResult, DataResult, new_date, get_devs, get_dev_limit
+from fastapi.middleware.cors import CORSMiddleware
+from .data import ActionResult, DataResult, new_date, get_devs, get_dev_limit, get_cors_list
 from .github import get_devs_contribs
 
 CURRENT_VERSION = '0.1.0'
@@ -10,6 +11,12 @@ if not IS_PROD_ENV:
     load_dotenv()
 
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=get_cors_list(),
+    allow_methods=['GET'],
+    allow_headers=['*'],
+)
 
 @app.get('/')
 async def health_check() -> ActionResult:
