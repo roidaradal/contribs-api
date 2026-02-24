@@ -12,3 +12,5 @@ v0.1.0 - Contribs API
     x Cache dev contribs results
     x Used cache result if still fresh and force=False
     x Version endpoint
+    x Add devs list endpoint 
+    x Add CORS list
