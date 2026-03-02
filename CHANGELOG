@@ -1,3 +1,12 @@
+v0.1.1 - Repos and Languages 
+    - Commit: 
+    x Fetch user repos list 
+    - Cache user repos list
+    - Fetch user languages from repos: number of bytes
+    - User languages: pretty print number of bytes (KB, MB)
+    - User languages: ratios
+    - Fetch team repos list 
+    - Fetch team languages data
 v0.1.0 - Contribs API 
     x Commit: 2026-02-14 23:57
     x Initialize FastAPI

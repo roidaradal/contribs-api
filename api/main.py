@@ -2,9 +2,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .data import ActionResult, DataResult, new_date, get_devs, get_dev_limit, get_cors_list
 from .github import get_devs_contribs
+from .api import get_dev_repos
 
-CURRENT_VERSION = '0.1.0'
-IS_PROD_ENV = True # Note: change to True before deploy
+CURRENT_VERSION = '0.1.1'
+IS_PROD_ENV = False # Note: change to True before deploy
 
 if not IS_PROD_ENV:
     from dotenv import load_dotenv
@@ -50,3 +51,11 @@ async def get_month_data(date_string: str = 'today', devs: str = '', force: bool
 async def get_devs_list(devs: str) -> DataResult:
     devs_list = get_devs(devs)
     return DataResult(data = devs_list)
+
+@app.get('/repos/{dev}')
+async def get_dev_repos_list(dev: str) -> DataResult:
+    dev_repos, err = await get_dev_repos(dev)
+    if err.has:
+        return DataResult(data=None, message=err.message)
+    return DataResult(data = dev_repos)
+    
