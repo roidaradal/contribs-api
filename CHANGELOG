@@ -1,7 +1,8 @@
 v0.1.1 - Repos and Languages 
     - Commit: 
     x Fetch user repos list 
-    - Cache user repos list
+    x Cache user repos list
+    - Fetch user repos all pages
     - Fetch user languages from repos: number of bytes
     - User languages: pretty print number of bytes (KB, MB)
     - User languages: ratios

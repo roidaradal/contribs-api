@@ -36,6 +36,10 @@ class Result:
 
 CONTRIBS_CACHE: dict[str, tuple[datetime, MonthContribs]] = {}   # username.month.year => (time_saved, MonthContribs)
 
+def is_valid_cache_entry(time_saved: datetime) -> bool:
+    cache_age_mins = (datetime.now() - time_saved).total_seconds() / 60 
+    return cache_age_mins < get_cache_ttl_mins()
+
 def get_cache_ttl_mins() -> int:
     '''Get cache TTL in minutes'''
     try:
@@ -69,8 +73,7 @@ async def fetch_dev_contribs(dev: str, input_date: date, force: bool, client: ht
     # Check cache first, if not force fetch
     if cache_key in CONTRIBS_CACHE and not force:
         time_saved, contribs = CONTRIBS_CACHE[cache_key]
-        cache_age_mins = (datetime.now() - time_saved).total_seconds() / 60
-        if cache_age_mins < get_cache_ttl_mins():
+        if is_valid_cache_entry(time_saved):
             # Use cached value if still fresh
             display_dev_total(dev, contribs, False)
             return Result(dev, contribs, Error())

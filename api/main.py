@@ -53,8 +53,8 @@ async def get_devs_list(devs: str) -> DataResult:
     return DataResult(data = devs_list)
 
 @app.get('/repos/{dev}')
-async def get_dev_repos_list(dev: str) -> DataResult:
-    dev_repos, err = await get_dev_repos(dev)
+async def get_dev_repos_list(dev: str, force: bool = False) -> DataResult:
+    dev_repos, err = await get_dev_repos(dev, force)
     if err.has:
         return DataResult(data=None, message=err.message)
     return DataResult(data = dev_repos)
