@@ -9,6 +9,7 @@ class Repo(BaseModel):
     name: str = ''
     full_name: str = ''
     description: str|None = None
+    size_kb: int = 0
 
 class ReposList(BaseModel):
     repos: list[Repo] = []
@@ -31,13 +32,27 @@ async def get_dev_repos(dev: str, force: bool) -> tuple[ReposList, Error]:
     try:
         async with httpx.AsyncClient() as client:
             print('Fetching user %s repos...' % dev)
-            response = await client.get(url, timeout=REQUEST_TIMEOUT)
-            repos = [Repo(  name = repo['name'],
-                            full_name = repo['full_name'],
-                            description = repo['description'],
-                        ) 
-                        for repo in response.json()
-                    ]
+            repos: list[Repo] = []
+
+            while url != '':
+                response = await client.get(url, timeout=REQUEST_TIMEOUT)
+                repos += [Repo(  name = repo['name'],
+                                full_name = repo['full_name'],
+                                description = repo['description'],
+                                size_kb = repo['size'],
+                            ) 
+                            for repo in response.json()
+                        ]
+                link = str(response.headers.get('Link', ''))
+                if link != '':
+                    parts = link.split(';')
+                    # Follow link while rel="next"
+                    if parts[1].strip().startswith('rel="next",'):
+                        link = parts[0].strip('<>')
+                    else:
+                        break
+                url = link
+
             print('Dev repos:', dev, 'fresh')
             reposList = ReposList(repos = repos, count = len(repos))
             # Add to cache 
