@@ -1,19 +1,27 @@
-import httpx
+import httpx, asyncio
 from datetime import datetime
 from pydantic import BaseModel 
 from .github import REQUEST_TIMEOUT, Error, is_valid_cache_entry
 
 REPOS_URL: str = 'https://api.github.com/users/%s/repos' # username
+LANGUAGES_URL: str = 'https://api.github.com/repos/%s/languages'
 
 class Repo(BaseModel):
     name: str = ''
     full_name: str = ''
     description: str|None = None
     size_kb: int = 0
+    languages: dict[str, int] = {}
 
 class ReposList(BaseModel):
     repos: list[Repo] = []
     count: int = 0
+
+class Result:
+    def __init__(self, repo: str, languages: dict[str,int], error: Error):
+        self.repo = repo 
+        self.languages = languages 
+        self.error = error
 
 REPOS_CACHE: dict[str, tuple[datetime, ReposList]] = {} # username => (time_saved, ReposList)
 
@@ -45,15 +53,27 @@ async def get_dev_repos(dev: str, force: bool) -> tuple[ReposList, Error]:
                         ]
                 link = str(response.headers.get('Link', ''))
                 if link != '':
-                    parts = link.split(';')
-                    # Follow link while rel="next"
-                    if parts[1].strip().startswith('rel="next",'):
-                        link = parts[0].strip('<>')
+                    next_link = [part.strip() for part in link.split(',') if part.strip().endswith('; rel="next"')]
+                    if len(next_link) == 1:
+                        link = next_link[0].split(';')[0].strip('<>')
                     else:
                         break
                 url = link
-
+            
             print('Dev repos:', dev, 'fresh')
+
+            # Fetch languages of repos in parallel
+            tasks = [get_repo_languages(repo.full_name, client) for repo in repos]
+            results = await asyncio.gather(*tasks)
+            repo_languages: dict[str, dict[str,int]] = {}
+            for r in results:
+                if r.error.has: continue 
+                repo_languages[r.repo] = r.languages
+            for repo in repos:
+                if repo.full_name not in repo_languages: continue 
+                repo.languages = repo_languages[repo.full_name]
+            print('Repo languages: OK')
+
             reposList = ReposList(repos = repos, count = len(repos))
             # Add to cache 
             REPOS_CACHE[dev] = (datetime.now(), reposList)
@@ -67,3 +87,19 @@ async def get_dev_repos(dev: str, force: bool) -> tuple[ReposList, Error]:
     except Exception as e:
         error = Error(message = f'Unexpected error occurred: {e}')
         return ReposList(), error
+
+async def get_repo_languages(repo: str, client: httpx.AsyncClient) -> Result:
+    url = LANGUAGES_URL % repo 
+    try: 
+        response = await client.get(url, timeout=REQUEST_TIMEOUT)
+        languages: dict[str, int] = response.json()
+        return Result(repo, languages, Error())
+    except httpx.HTTPStatusError as e:
+        error = Error(message = f'Status Error: {e.response.status_code}')
+        return Result(repo, {}, error)
+    except httpx.RequestError as e:
+        error = Error(message = f'Request Error: {e.request.url}')
+        return Result(repo, {}, error)
+    except Exception as e:
+        error = Error(message = f'Unexpected error occurred: {e}')
+        return Result(repo, {}, error)
