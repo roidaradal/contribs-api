@@ -1,4 +1,4 @@
-import httpx, asyncio
+import os, httpx, asyncio
 from datetime import datetime
 from pydantic import BaseModel 
 from .github import REQUEST_TIMEOUT, Error, is_valid_cache_entry
@@ -25,6 +25,9 @@ class Result:
 
 REPOS_CACHE: dict[str, tuple[datetime, ReposList]] = {} # username => (time_saved, ReposList)
 
+def get_github_api_token() -> str:
+    return os.getenv('GITHUB_API_TOKEN') or ''
+
 async def get_dev_repos(dev: str, force: bool) -> tuple[ReposList, Error]:
     '''Fetch dev's list of repos'''
     url = REPOS_URL % dev 
@@ -38,12 +41,17 @@ async def get_dev_repos(dev: str, force: bool) -> tuple[ReposList, Error]:
             return reposList, Error()
         
     try:
+        headers: dict[str,str] = {
+            'Authorization': f'Bearer {get_github_api_token()}',
+            'X-GitHub-Api-Version': '2022-11-28',
+            'Accept': 'application/vnd.github+json',
+        }
         async with httpx.AsyncClient() as client:
             print('Fetching user %s repos...' % dev)
             repos: list[Repo] = []
 
             while url != '':
-                response = await client.get(url, timeout=REQUEST_TIMEOUT)
+                response = await client.get(url, timeout=REQUEST_TIMEOUT, headers=headers)
                 repos += [Repo(  name = repo['name'],
                                 full_name = repo['full_name'],
                                 description = repo['description'],
@@ -51,7 +59,7 @@ async def get_dev_repos(dev: str, force: bool) -> tuple[ReposList, Error]:
                             ) 
                             for repo in response.json()
                         ]
-                link = str(response.headers.get('Link', ''))
+                link = str(response.headers.get('Link', '')) 
                 if link != '':
                     next_link = [part.strip() for part in link.split(',') if part.strip().endswith('; rel="next"')]
                     if len(next_link) == 1:
@@ -63,11 +71,13 @@ async def get_dev_repos(dev: str, force: bool) -> tuple[ReposList, Error]:
             print('Dev repos:', dev, 'fresh')
 
             # Fetch languages of repos in parallel
-            tasks = [get_repo_languages(repo.full_name, client) for repo in repos]
+            tasks = [get_repo_languages(repo.full_name, headers, client) for repo in repos]
             results = await asyncio.gather(*tasks)
             repo_languages: dict[str, dict[str,int]] = {}
             for r in results:
-                if r.error.has: continue 
+                if r.error.has:
+                    print(r.repo, r.error) 
+                    continue 
                 repo_languages[r.repo] = r.languages
             for repo in repos:
                 if repo.full_name not in repo_languages: continue 
@@ -88,10 +98,10 @@ async def get_dev_repos(dev: str, force: bool) -> tuple[ReposList, Error]:
         error = Error(message = f'Unexpected error occurred: {e}')
         return ReposList(), error
 
-async def get_repo_languages(repo: str, client: httpx.AsyncClient) -> Result:
+async def get_repo_languages(repo: str, headers: dict[str,str], client: httpx.AsyncClient) -> Result:
     url = LANGUAGES_URL % repo 
     try: 
-        response = await client.get(url, timeout=REQUEST_TIMEOUT)
+        response = await client.get(url, timeout=REQUEST_TIMEOUT, headers = headers)
         languages: dict[str, int] = response.json()
         return Result(repo, languages, Error())
     except httpx.HTTPStatusError as e:
