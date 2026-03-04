@@ -5,9 +5,9 @@ v0.1.1 - Repos and Languages
     x Fetch user repos all pages
     x Fetch user repo languages 
     x Add GitHub API token in header
-    x Fetch user languages from repos: number of bytes
-    - User languages: pretty print number of bytes (KB, MB)
-    - User languages: ratios
+    x Fetch user languages from repos
+        x number of bytes: pretty print 
+        x ratios
     - Fetch team repos list 
     - Fetch team languages data
 v0.1.0 - Contribs API 

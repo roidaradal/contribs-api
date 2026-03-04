@@ -18,9 +18,9 @@ class ReposList(BaseModel):
     count: int = 0
 
 class DevLanguages(BaseModel):
-    languages: dict[str, int] = {}
+    languages: dict[str, tuple[str, float]] = {}
     count: int = 0 
-    total_bytes: int = 0
+    total_bytes: str = ''
 
 class Result:
     def __init__(self, repo: str, languages: dict[str,int], error: Error):
@@ -122,16 +122,38 @@ async def get_repo_languages(repo: str, headers: dict[str,str], client: httpx.As
         return Result(repo, {}, error)
     
 async def get_dev_languages(dev: str, force: bool) -> tuple[DevLanguages, Error]:
-    reposList, error = await get_dev_repos(dev, force)
+    data, error = await get_dev_repos(dev, force)
     if error.has:
         return DevLanguages(), error
     
-    languages: dict[str, int] = {}
-    total = 0 
-    for repo in reposList.repos:
+    total: dict[str, int] = {}
+    for repo in data.repos:
         for language, size in repo.languages.items():
-            languages.setdefault(language, 0)
-            languages[language] += size
-            total += size
+            total.setdefault(language, 0)
+            total[language] += size
+    dev_total = sum(total.values())
+    languages: dict[str, tuple[str,float]] = {}
+    for language, language_size in total.items():
+        size = string_bytes(language_size)
+        ratio = float(language_size) / dev_total
+        ratio = float('%.4f' % ratio)
+        languages[language] = (size, ratio)
 
-    return DevLanguages(languages = languages, count = len(languages), total_bytes = total), Error()
+    return DevLanguages(languages = languages, count = len(languages), total_bytes = string_bytes(dev_total)), Error()
+
+
+def string_bytes(num_bytes: int) -> str:
+    '''Convert num_bytes to human-readable size'''
+    B = float(num_bytes)
+    KB = float(1024)
+    MB = float(KB ** 2)
+    GB = float(KB ** 3)
+
+    if B < KB:
+        return '{0} B'.format(B)
+    elif KB <= B < MB:
+        return '{0:.1f} KB'.format(B / KB)
+    elif MB <= B < GB:
+        return '{0:.1f} MB'.format(B / MB)
+    else:
+        return '{0:.1f} GB'.format(B / GB)

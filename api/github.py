@@ -3,7 +3,7 @@ from bs4 import BeautifulSoup
 from datetime import date, datetime
 from pydantic import BaseModel, model_serializer
 
-REQUEST_TIMEOUT = 10.0
+REQUEST_TIMEOUT = 30.0
 HTML_URL: str = 'https://github.com/users/%s/contributions?from=%s' # (username, start_date)
 
 class Contrib(BaseModel):
