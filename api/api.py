@@ -17,6 +17,11 @@ class ReposList(BaseModel):
     repos: list[Repo] = []
     count: int = 0
 
+class DevLanguages(BaseModel):
+    languages: dict[str, int] = {}
+    count: int = 0 
+    total_bytes: int = 0
+
 class Result:
     def __init__(self, repo: str, languages: dict[str,int], error: Error):
         self.repo = repo 
@@ -25,8 +30,14 @@ class Result:
 
 REPOS_CACHE: dict[str, tuple[datetime, ReposList]] = {} # username => (time_saved, ReposList)
 
-def get_github_api_token() -> str:
-    return os.getenv('GITHUB_API_TOKEN') or ''
+def get_github_api_headers() -> dict[str,str]:
+    '''GitHub API headers'''
+    token = os.getenv('GITHUB_API_TOKEN') or ''
+    return {
+        'Authorization': f'Bearer {token}',
+        'X-GitHub-Api-Version': '2022-11-28',
+        'Accept': 'application/vnd.github+json',
+    }
 
 async def get_dev_repos(dev: str, force: bool) -> tuple[ReposList, Error]:
     '''Fetch dev's list of repos'''
@@ -41,11 +52,7 @@ async def get_dev_repos(dev: str, force: bool) -> tuple[ReposList, Error]:
             return reposList, Error()
         
     try:
-        headers: dict[str,str] = {
-            'Authorization': f'Bearer {get_github_api_token()}',
-            'X-GitHub-Api-Version': '2022-11-28',
-            'Accept': 'application/vnd.github+json',
-        }
+        headers: dict[str,str] = get_github_api_headers()
         async with httpx.AsyncClient() as client:
             print('Fetching user %s repos...' % dev)
             repos: list[Repo] = []
@@ -113,3 +120,18 @@ async def get_repo_languages(repo: str, headers: dict[str,str], client: httpx.As
     except Exception as e:
         error = Error(message = f'Unexpected error occurred: {e}')
         return Result(repo, {}, error)
+    
+async def get_dev_languages(dev: str, force: bool) -> tuple[DevLanguages, Error]:
+    reposList, error = await get_dev_repos(dev, force)
+    if error.has:
+        return DevLanguages(), error
+    
+    languages: dict[str, int] = {}
+    total = 0 
+    for repo in reposList.repos:
+        for language, size in repo.languages.items():
+            languages.setdefault(language, 0)
+            languages[language] += size
+            total += size
+
+    return DevLanguages(languages = languages, count = len(languages), total_bytes = total), Error()
