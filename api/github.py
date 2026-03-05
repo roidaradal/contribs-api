@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 from datetime import date, datetime
 from pydantic import BaseModel, model_serializer
 
+REQUEST_TIMEOUT = 30.0
 HTML_URL: str = 'https://github.com/users/%s/contributions?from=%s' # (username, start_date)
 
 class Contrib(BaseModel):
@@ -33,12 +34,17 @@ class Result:
         self.contribs = contribs 
         self.error = error
 
-CACHE: dict[str, tuple[datetime, MonthContribs]] = {}   # username.month.year => (time_saved, MonthContribs)
+CONTRIBS_CACHE: dict[str, tuple[datetime, MonthContribs]] = {}   # username.month.year => (time_saved, MonthContribs)
 
-def get_cache_ttl_mins() -> int:
-    '''Get cache TTL in minutes'''
+def is_valid_cache_entry(time_saved: datetime) -> bool:
+    '''Check if time saved is still fresh based on cache TTL'''
+    cache_age_mins = (datetime.now() - time_saved).total_seconds() / 60 
+    return cache_age_mins < get_contribs_cache_ttl_mins()
+
+def get_contribs_cache_ttl_mins() -> int:
+    '''Get contribs cache TTL in minutes'''
     try:
-        ttl = int(os.getenv('CACHE_TTL_MINS') or '60')
+        ttl = int(os.getenv('CONTRIBS_CACHE_TTL_MINS') or '60')
         return max(1, ttl) # floor cache TTL = 1 minute
     except:
         return 60 # default cache TTL
@@ -66,10 +72,9 @@ async def fetch_dev_contribs(dev: str, input_date: date, force: bool, client: ht
     cache_key = '%s.%d.%d' % (dev.lower(), month, year)
 
     # Check cache first, if not force fetch
-    if cache_key in CACHE and not force:
-        time_saved, contribs = CACHE[cache_key]
-        cache_age_mins = (datetime.now() - time_saved).total_seconds() / 60
-        if cache_age_mins < get_cache_ttl_mins():
+    if cache_key in CONTRIBS_CACHE and not force:
+        time_saved, contribs = CONTRIBS_CACHE[cache_key]
+        if is_valid_cache_entry(time_saved):
             # Use cached value if still fresh
             display_dev_total(dev, contribs, False)
             return Result(dev, contribs, Error())
@@ -78,7 +83,7 @@ async def fetch_dev_contribs(dev: str, input_date: date, force: bool, client: ht
     year_start = date(year, 1, 1) # January 1 of given year
     url = HTML_URL % (dev, str(year_start))
     try:
-        response = await client.get(url, timeout=10.0)
+        response = await client.get(url, timeout=REQUEST_TIMEOUT)
         soup = BeautifulSoup(response.text, 'html.parser')
     except httpx.HTTPStatusError as e:
         error = Error(message = f'Status Error: {e.response.status_code}')
@@ -112,6 +117,7 @@ async def fetch_dev_contribs(dev: str, input_date: date, force: bool, client: ht
         contribs[str(day)] = Contrib(count = count, level = level)
 
     # Add to cache 
-    CACHE[cache_key] = (datetime.now(), contribs)
+    CONTRIBS_CACHE[cache_key] = (datetime.now(), contribs)
     display_dev_total(dev, contribs, True)
     return Result(dev, contribs, Error())
+
