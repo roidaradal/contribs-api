@@ -73,6 +73,21 @@ async def get_dev_repos(dev: str, force: bool) -> tuple[ReposList, Error]:
     async with httpx.AsyncClient() as client:
         result = await fetch_dev_repos(dev, force, headers, client)
         return result.data, result.error
+    
+async def get_devs_repos(devs: list[str], force: bool) -> tuple[dict[str, ReposList], Error]:
+    '''Get devs repos'''
+    headers = get_github_api_headers()
+    async with httpx.AsyncClient() as client:
+        tasks = [fetch_dev_repos(dev, force, headers, client) for dev in devs]
+        results = await asyncio.gather(*tasks)
+        dev_repos: dict[str, ReposList] = {}
+        for r in results:
+            if r.error.has:
+                print('ErrDevRepo:', r.dev, r.error)
+                continue
+            dev_repos[r.dev] = r.data
+        return dev_repos, Error()
+
 
 async def fetch_dev_repos(dev: str, force: bool, headers: dict[str, str], client: httpx.AsyncClient) -> RepoResult:
     '''Fetch dev's list of repos'''
@@ -184,7 +199,7 @@ async def get_dev_languages(dev: str, force: bool) -> tuple[DevLanguages, Error]
         repo_languages: dict[str, dict[str, int]] = {}
         for r in results:
             if r.error.has:
-                print('Error:', r.repo, r.error)
+                print('ErrDevLang:', r.repo, r.error)
                 continue
             repo_languages[r.repo] = {k:v.num_bytes for k,v in r.languages.items()}
         

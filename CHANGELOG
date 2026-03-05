@@ -1,5 +1,5 @@
 v0.1.1 - Repos and Languages 
-    - Commit: 
+    x Commit: 2026-03-05 23:21
     x Fetch user repos list 
     x Cache user repos list
     x Fetch user repos all pages
@@ -9,8 +9,7 @@ v0.1.1 - Repos and Languages
         x number of bytes: pretty print 
         x ratios
     x Fetch repo languages
-    - Fetch team repos list 
-    - Fetch team languages data
+    x Fetch team repos list
 v0.1.0 - Contribs API 
     x Commit: 2026-02-14 23:57
     x Initialize FastAPI
