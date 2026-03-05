@@ -8,6 +8,7 @@ v0.1.1 - Repos and Languages
     x Fetch user languages from repos
         x number of bytes: pretty print 
         x ratios
+    x Fetch repo languages
     - Fetch team repos list 
     - Fetch team languages data
 v0.1.0 - Contribs API 

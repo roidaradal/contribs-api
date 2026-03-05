@@ -17,18 +17,27 @@ class ReposList(BaseModel):
     repos: list[Repo] = []
     count: int = 0
 
+class LanguageStats(BaseModel):
+    num_bytes: int = 0
+    size: str = ''
+    ratio: float = 0.0
+
+LanguageInfo = dict[str, LanguageStats]
+
 class DevLanguages(BaseModel):
-    languages: dict[str, tuple[str, float]] = {}
+    languages: LanguageInfo = {}
     count: int = 0 
     total_bytes: str = ''
 
 class Result:
-    def __init__(self, repo: str, languages: dict[str,int], error: Error):
+    def __init__(self, repo: str, languages: LanguageInfo, error: Error):
         self.repo = repo 
         self.languages = languages 
         self.error = error
 
+
 REPOS_CACHE: dict[str, tuple[datetime, ReposList]] = {} # username => (time_saved, ReposList)
+LANGS_CACHE: dict[str, tuple[datetime, LanguageInfo]] = {} # repo_name => (time_saved, LanguageInfo)
 
 def get_github_api_headers() -> dict[str,str]:
     '''GitHub API headers'''
@@ -56,16 +65,16 @@ async def get_dev_repos(dev: str, force: bool) -> tuple[ReposList, Error]:
     '''Fetch dev's list of repos'''
     url = REPOS_URL % dev 
     
-    #Check cache first, if not force fetch
+    # Check cache first, if not force fetch
     if dev in REPOS_CACHE and not force:
-        time_saved, reposList = REPOS_CACHE[dev]
+        time_saved, repos_list = REPOS_CACHE[dev]
         if is_valid_cache_entry(time_saved):
             # Used cached value if still fresh
             print('Dev repos:', dev, 'cache') 
-            return reposList, Error()
+            return repos_list, Error()
         
     try:
-        headers: dict[str,str] = get_github_api_headers()
+        headers = get_github_api_headers()
         async with httpx.AsyncClient() as client:
             print('Fetching user %s repos...' % dev)
             repos: list[Repo] = []
@@ -90,10 +99,10 @@ async def get_dev_repos(dev: str, force: bool) -> tuple[ReposList, Error]:
                 url = link
             
             print('Dev repos:', dev, 'fresh')
-            reposList = ReposList(repos = repos, count = len(repos))
+            repos_list = ReposList(repos = repos, count = len(repos))
             # Add to cache 
-            REPOS_CACHE[dev] = (datetime.now(), reposList)
-            return reposList, Error()
+            REPOS_CACHE[dev] = (datetime.now(), repos_list)
+            return repos_list, Error()
     except httpx.HTTPStatusError as e:
         error = Error(message = f'Status Error: {e.response.status_code}')
         return ReposList(), error
@@ -104,12 +113,39 @@ async def get_dev_repos(dev: str, force: bool) -> tuple[ReposList, Error]:
         error = Error(message = f'Unexpected error occurred: {e}')
         return ReposList(), error
 
-async def get_repo_languages(repo: str, headers: dict[str,str], client: httpx.AsyncClient) -> Result:
-    '''Fetch repo languages'''
+async def get_repo_languages(repo: str, force: bool) -> Result:
+    '''Get repo languages'''
+    headers = get_github_api_headers()
+    async with httpx.AsyncClient() as client:
+        return await fetch_repo_languages(repo, force, headers, client)
+
+async def fetch_repo_languages(repo: str, force: bool, headers: dict[str,str], client: httpx.AsyncClient) -> Result:
+    '''Fetch repo languages from cache or from GitHub API'''
     url = LANGUAGES_URL % repo 
-    try: 
+
+    # Check cache first, if not force 
+    if repo in LANGS_CACHE and not force:
+        time_saved, languages = LANGS_CACHE[repo]
+        if is_valid_cache_entry(time_saved):
+            # Used cached value if still fresh 
+            print('Repo languages:', repo, 'cache')
+            return Result(repo, languages, Error())
+        
+    try:
+        print('Fetching repo %s languages...' % repo) 
         response = await client.get(url, timeout=REQUEST_TIMEOUT, headers = headers)
-        languages: dict[str, int] = response.json()
+        raw_languages: dict[str, int] = response.json()
+        print('Repo languages:', repo, 'fresh')
+        languages: LanguageInfo = {}
+        total = float(sum(raw_languages.values()))
+        for key, num_bytes in raw_languages.items():
+            languages[key] = LanguageStats(
+                num_bytes = num_bytes,
+                size = string_bytes(num_bytes),
+                ratio = size_ratio(num_bytes, total)
+            )
+        # Add to cache 
+        LANGS_CACHE[repo] = (datetime.now(), languages)
         return Result(repo, languages, Error())
     except httpx.HTTPStatusError as e:
         error = Error(message = f'Status Error: {e.response.status_code}')
@@ -121,26 +157,25 @@ async def get_repo_languages(repo: str, headers: dict[str,str], client: httpx.As
         error = Error(message = f'Unexpected error occurred: {e}')
         return Result(repo, {}, error)
     
-async def get_dev_languages(dev: str, force: bool) -> tuple[DevLanguages, Error]:
-    data, error = await get_dev_repos(dev, force)
-    if error.has:
-        return DevLanguages(), error
+# async def get_dev_languages(dev: str, force: bool) -> tuple[DevLanguages, Error]:
+#     data, error = await get_dev_repos(dev, force)
+#     if error.has:
+#         return DevLanguages(), error
     
-    total: dict[str, int] = {}
-    # for repo in data.repos:
-    #     for language, size in repo.languages.items():
-    #         total.setdefault(language, 0)
-    #         total[language] += size
-    dev_total = sum(total.values())
-    languages: dict[str, tuple[str,float]] = {}
-    # for language, language_size in total.items():
-    #     size = string_bytes(language_size)
-    #     ratio = float(language_size) / dev_total
-    #     ratio = float('%.4f' % ratio)
-    #     languages[language] = (size, ratio)
+#     total: dict[str, int] = {}
+#     # for repo in data.repos:
+#     #     for language, size in repo.languages.items():
+#     #         total.setdefault(language, 0)
+#     #         total[language] += size
+#     dev_total = sum(total.values())
+#     languages: dict[str, tuple[str,float]] = {}
+#     # for language, language_size in total.items():
+#     #     size = string_bytes(language_size)
+#     #     ratio = float(language_size) / dev_total
+#     #     ratio = float('%.4f' % ratio)
+#     #     languages[language] = (size, ratio)
 
-    return DevLanguages(languages = languages, count = len(languages), total_bytes = string_bytes(dev_total)), Error()
-
+#     return DevLanguages(languages = languages, count = len(languages), total_bytes = string_bytes(dev_total)), Error()
 
 def string_bytes(num_bytes: int) -> str:
     '''Convert num_bytes to human-readable size'''
@@ -157,6 +192,10 @@ def string_bytes(num_bytes: int) -> str:
         return '{0:.1f} MB'.format(B / MB)
     else:
         return '{0:.1f} GB'.format(B / GB)
+    
+def size_ratio(num_bytes: int, total: float) -> float:
+    ratio = '%.4f' % (num_bytes / total)
+    return float(ratio)
 
 '''
 # Fetch languages of repos in parallel
