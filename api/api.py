@@ -29,7 +29,13 @@ class DevLanguages(BaseModel):
     count: int = 0 
     total_bytes: str = ''
 
-class Result:
+class RepoResult:
+    def __init__(self, dev: str, repos: ReposList, error: Error):
+        self.dev = dev 
+        self.data = repos 
+        self.error = error
+
+class LanguageResult:
     def __init__(self, repo: str, languages: LanguageInfo, error: Error):
         self.repo = repo 
         self.languages = languages 
@@ -62,6 +68,13 @@ def get_repos_cache_ttl_hours() -> int:
         return 48 # default cache TTL
 
 async def get_dev_repos(dev: str, force: bool) -> tuple[ReposList, Error]:
+    '''Get dev repos'''
+    headers = get_github_api_headers()
+    async with httpx.AsyncClient() as client:
+        result = await fetch_dev_repos(dev, force, headers, client)
+        return result.data, result.error
+
+async def fetch_dev_repos(dev: str, force: bool, headers: dict[str, str], client: httpx.AsyncClient) -> RepoResult:
     '''Fetch dev's list of repos'''
     url = REPOS_URL % dev 
     
@@ -71,55 +84,54 @@ async def get_dev_repos(dev: str, force: bool) -> tuple[ReposList, Error]:
         if is_valid_cache_entry(time_saved):
             # Used cached value if still fresh
             print('Dev repos:', dev, 'cache') 
-            return repos_list, Error()
+            return RepoResult(dev, repos_list, Error())
         
     try:
-        headers = get_github_api_headers()
-        async with httpx.AsyncClient() as client:
-            print('Fetching user %s repos...' % dev)
-            repos: list[Repo] = []
+        print('Fetching user %s repos...' % dev)
+        repos: list[Repo] = []
 
-            while url != '':
-                response = await client.get(url, timeout=REQUEST_TIMEOUT, headers=headers)
-                repos += [Repo(  name = repo['name'],
-                                full_name = repo['full_name'],
-                                description = repo['description'],
-                                size_kb = repo['size'],
-                                size = string_bytes(int(repo['size']) * 1024),
-                            ) 
-                            for repo in response.json()
-                        ]
-                link = str(response.headers.get('Link', '')) 
-                if link != '':
-                    next_link = [part.strip() for part in link.split(',') if part.strip().endswith('; rel="next"')]
-                    if len(next_link) == 1:
-                        link = next_link[0].split(';')[0].strip('<>')
-                    else:
-                        break
-                url = link
-            
-            print('Dev repos:', dev, 'fresh')
-            repos_list = ReposList(repos = repos, count = len(repos))
-            # Add to cache 
-            REPOS_CACHE[dev] = (datetime.now(), repos_list)
-            return repos_list, Error()
+        while url != '':
+            response = await client.get(url, timeout=REQUEST_TIMEOUT, headers=headers)
+            repos += [Repo(  name = repo['name'],
+                            full_name = repo['full_name'],
+                            description = repo['description'],
+                            size_kb = repo['size'],
+                            size = string_bytes(int(repo['size']) * 1024),
+                        ) 
+                        for repo in response.json()
+                    ]
+            link = str(response.headers.get('Link', '')) 
+            if link != '':
+                next_link = [part.strip() for part in link.split(',') if part.strip().endswith('; rel="next"')]
+                if len(next_link) == 1:
+                    link = next_link[0].split(';')[0].strip('<>')
+                else:
+                    break
+            url = link
+        
+        print('Dev repos:', dev, 'fresh')
+        repos_list = ReposList(repos = repos, count = len(repos))
+        # Add to cache 
+        REPOS_CACHE[dev] = (datetime.now(), repos_list)
+        return RepoResult(dev, repos_list, Error())
     except httpx.HTTPStatusError as e:
         error = Error(message = f'Status Error: {e.response.status_code}')
-        return ReposList(), error
+        return RepoResult(dev, ReposList(), error)
     except httpx.RequestError as e:
         error = Error(message = f'Request Error: {e.request.url}')
-        return ReposList(), error
+        return RepoResult(dev, ReposList(), error)
     except Exception as e:
         error = Error(message = f'Unexpected error occurred: {e}')
-        return ReposList(), error
+        return RepoResult(dev, ReposList(), error)
 
-async def get_repo_languages(repo: str, force: bool) -> Result:
+async def get_repo_languages(repo: str, force: bool) -> tuple[LanguageInfo, Error]:
     '''Get repo languages'''
     headers = get_github_api_headers()
     async with httpx.AsyncClient() as client:
-        return await fetch_repo_languages(repo, force, headers, client)
+        result = await fetch_repo_languages(repo, force, headers, client)
+        return result.languages, result.error
 
-async def fetch_repo_languages(repo: str, force: bool, headers: dict[str,str], client: httpx.AsyncClient) -> Result:
+async def fetch_repo_languages(repo: str, force: bool, headers: dict[str,str], client: httpx.AsyncClient) -> LanguageResult:
     '''Fetch repo languages from cache or from GitHub API'''
     url = LANGUAGES_URL % repo 
 
@@ -128,14 +140,14 @@ async def fetch_repo_languages(repo: str, force: bool, headers: dict[str,str], c
         time_saved, languages = LANGS_CACHE[repo]
         if is_valid_cache_entry(time_saved):
             # Used cached value if still fresh 
-            print('Repo languages:', repo, 'cache')
-            return Result(repo, languages, Error())
+            # print('Repo languages:', repo, 'cache')
+            return LanguageResult(repo, languages, Error())
         
     try:
-        print('Fetching repo %s languages...' % repo) 
+        # print('Fetching repo %s languages...' % repo) 
         response = await client.get(url, timeout=REQUEST_TIMEOUT, headers = headers)
         raw_languages: dict[str, int] = response.json()
-        print('Repo languages:', repo, 'fresh')
+        # print('Repo languages:', repo, 'fresh')
         languages: LanguageInfo = {}
         total = float(sum(raw_languages.values()))
         for key, num_bytes in raw_languages.items():
@@ -146,36 +158,55 @@ async def fetch_repo_languages(repo: str, force: bool, headers: dict[str,str], c
             )
         # Add to cache 
         LANGS_CACHE[repo] = (datetime.now(), languages)
-        return Result(repo, languages, Error())
+        return LanguageResult(repo, languages, Error())
     except httpx.HTTPStatusError as e:
         error = Error(message = f'Status Error: {e.response.status_code}')
-        return Result(repo, {}, error)
+        return LanguageResult(repo, {}, error)
     except httpx.RequestError as e:
         error = Error(message = f'Request Error: {e.request.url}')
-        return Result(repo, {}, error)
+        return LanguageResult(repo, {}, error)
     except Exception as e:
         error = Error(message = f'Unexpected error occurred: {e}')
-        return Result(repo, {}, error)
+        return LanguageResult(repo, {}, error)
     
-# async def get_dev_languages(dev: str, force: bool) -> tuple[DevLanguages, Error]:
-#     data, error = await get_dev_repos(dev, force)
-#     if error.has:
-#         return DevLanguages(), error
-    
-#     total: dict[str, int] = {}
-#     # for repo in data.repos:
-#     #     for language, size in repo.languages.items():
-#     #         total.setdefault(language, 0)
-#     #         total[language] += size
-#     dev_total = sum(total.values())
-#     languages: dict[str, tuple[str,float]] = {}
-#     # for language, language_size in total.items():
-#     #     size = string_bytes(language_size)
-#     #     ratio = float(language_size) / dev_total
-#     #     ratio = float('%.4f' % ratio)
-#     #     languages[language] = (size, ratio)
-
-#     return DevLanguages(languages = languages, count = len(languages), total_bytes = string_bytes(dev_total)), Error()
+async def get_dev_languages(dev: str, force: bool) -> tuple[DevLanguages, Error]:
+    '''Get dev languages'''
+    headers = get_github_api_headers()
+    async with httpx.AsyncClient() as client:
+        result = await fetch_dev_repos(dev, force, headers, client)
+        if result.error.has:
+            return DevLanguages(), result.error
+        
+        # Fetch languages of repos in parallel
+        repos = result.data.repos
+        tasks = [fetch_repo_languages(repo.full_name, force, headers, client) for repo in repos]
+        results = await asyncio.gather(*tasks)
+        repo_languages: dict[str, dict[str, int]] = {}
+        for r in results:
+            if r.error.has:
+                print('Error:', r.repo, r.error)
+                continue
+            repo_languages[r.repo] = {k:v.num_bytes for k,v in r.languages.items()}
+        
+        total: dict[str, int] = {}
+        for languages in repo_languages.values():
+            for language, num_bytes in languages.items():
+                total.setdefault(language, 0)
+                total[language] += num_bytes
+        dev_total = sum(total.values())
+        dev_languages: LanguageInfo = {}
+        for language, num_bytes in total.items():
+            dev_languages[language] = LanguageStats(
+                num_bytes = num_bytes,
+                size = string_bytes(num_bytes),
+                ratio = size_ratio(num_bytes, float(dev_total)),
+            )
+        output = DevLanguages(
+            languages = dev_languages,
+            count = len(dev_languages),
+            total_bytes = string_bytes(dev_total),
+        )
+        return output, Error()
 
 def string_bytes(num_bytes: int) -> str:
     '''Convert num_bytes to human-readable size'''
@@ -194,21 +225,6 @@ def string_bytes(num_bytes: int) -> str:
         return '{0:.1f} GB'.format(B / GB)
     
 def size_ratio(num_bytes: int, total: float) -> float:
+    '''Compute ratio then format to 4 decimal places'''
     ratio = '%.4f' % (num_bytes / total)
     return float(ratio)
-
-'''
-# Fetch languages of repos in parallel
-tasks = [get_repo_languages(repo.full_name, headers, client) for repo in repos]
-results = await asyncio.gather(*tasks)
-repo_languages: dict[str, dict[str,int]] = {}
-for r in results:
-    if r.error.has:
-        print(r.repo, r.error) 
-        continue 
-    repo_languages[r.repo] = r.languages
-for repo in repos:
-    if repo.full_name not in repo_languages: continue 
-    repo.languages = repo_languages[repo.full_name]
-print('Repo languages: OK')
-'''

@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .data import ActionResult, DataResult, new_date, get_devs, get_dev_limit, get_cors_list
 from .github import get_devs_contribs
-from .api import get_dev_repos, get_repo_languages
+from .api import get_dev_repos, get_repo_languages, get_dev_languages
 
 CURRENT_VERSION = '0.1.1'
 IS_PROD_ENV = False # Note: change to True before deploy
@@ -48,12 +48,12 @@ async def get_month_data(date_string: str = 'today', devs: str = '', force: bool
     })
 
 @app.get('/devs/{devs}')
-async def get_devs_list(devs: str) -> DataResult:
+async def get_devs_data(devs: str) -> DataResult:
     devs_list = get_devs(devs)
     return DataResult(data = devs_list)
 
 @app.get('/repos/{dev}')
-async def get_dev_repos_list(dev: str, force: bool = False) -> DataResult:
+async def get_dev_repos_data(dev: str, force: bool = False) -> DataResult:
     dev_repos, err = await get_dev_repos(dev, force)
     if err.has:
         return DataResult(data=None, message=err.message)
@@ -61,14 +61,14 @@ async def get_dev_repos_list(dev: str, force: bool = False) -> DataResult:
 
 @app.get('/repo/{dev}/{repo}/languages')
 async def get_repo_languages_data(dev: str, repo: str, force: bool=False) -> DataResult:
-    result = await get_repo_languages(f'{dev}/{repo}', force)
-    if result.error.has:
-        return DataResult(data=None, message=result.error.message)
-    return DataResult(data = result.languages)
+    languages, err = await get_repo_languages(f'{dev}/{repo}', force)
+    if err.has:
+        return DataResult(data=None, message=err.message)
+    return DataResult(data = languages)
     
-# @app.get('/languages/{dev}')
-# async def get_dev_languages_data(dev: str, force: bool = False) -> DataResult:
-#     dev_languages, err = await get_dev_languages(dev, force)
-#     if err.has:
-#         return DataResult(data=None, message=err.message)
-#     return DataResult(data = dev_languages)
+@app.get('/languages/{dev}')
+async def get_dev_languages_data(dev: str, force: bool = False) -> DataResult:
+    dev_languages, err = await get_dev_languages(dev, force)
+    if err.has:
+        return DataResult(data=None, message=err.message)
+    return DataResult(data = dev_languages)
