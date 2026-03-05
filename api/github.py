@@ -37,13 +37,14 @@ class Result:
 CONTRIBS_CACHE: dict[str, tuple[datetime, MonthContribs]] = {}   # username.month.year => (time_saved, MonthContribs)
 
 def is_valid_cache_entry(time_saved: datetime) -> bool:
+    '''Check if time saved is still fresh based on cache TTL'''
     cache_age_mins = (datetime.now() - time_saved).total_seconds() / 60 
-    return cache_age_mins < get_cache_ttl_mins()
+    return cache_age_mins < get_contribs_cache_ttl_mins()
 
-def get_cache_ttl_mins() -> int:
-    '''Get cache TTL in minutes'''
+def get_contribs_cache_ttl_mins() -> int:
+    '''Get contribs cache TTL in minutes'''
     try:
-        ttl = int(os.getenv('CACHE_TTL_MINS') or '60')
+        ttl = int(os.getenv('CONTRIBS_CACHE_TTL_MINS') or '60')
         return max(1, ttl) # floor cache TTL = 1 minute
     except:
         return 60 # default cache TTL
