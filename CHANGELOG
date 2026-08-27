@@ -1,3 +1,19 @@
+TODO:
+v0.1.x - 
+    - Commit: 
+    - Review items in prod not cached:
+        - repos/{dev}
+    - Concurrency-safe maps for cache
+    - Add LastUpdateAt info for returned data:
+        - /contribs 
+        - /devs/repos 
+        - /repos/{dev}
+        - /repo/{dev}/{repo}/languages 
+        - /languages/{dev}
+#######################################################################
+v0.2.0 - Refactor 
+    - Commit:
+    x Reset main API
 v0.1.1 - Repos and Languages 
     x Commit: 2026-03-05 23:21
     x Fetch user repos list 
