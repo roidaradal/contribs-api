@@ -14,6 +14,7 @@ v0.1.x -
 v0.2.0 - Refactor 
     - Commit:
     x Reset main API
+    x Data functions
 v0.1.1 - Repos and Languages 
     x Commit: 2026-03-05 23:21
     x Fetch user repos list 
